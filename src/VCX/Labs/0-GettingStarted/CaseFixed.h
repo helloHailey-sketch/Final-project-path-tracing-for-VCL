@@ -10,7 +10,7 @@ namespace VCX::Labs::GettingStarted {
     public:
         CaseFixed();
 
-        virtual std::string_view const GetName() override { return "Draw Fixed Images"; }
+        virtual std::string_view const GetName() override { return "Path tracing"; }
         
         virtual void OnSetupPropsUI() override;
         virtual Common::CaseRenderResult OnRender(std::pair<std::uint32_t, std::uint32_t> const desiredSize) override;
@@ -22,8 +22,8 @@ namespace VCX::Labs::GettingStarted {
         std::array<Common::ImageRGB, 2>            _empty;
         Engine::Async<Common::ImageRGB>            _task;
 
-        int  _sizeId     = 0;
-        int  _bgId       = 0;
+        int  _sizeId     = 0; //渲染尺寸
+        int  _bgId       = 0; //选择背景
         bool _enableZoom = true;
         bool _recompute  = true;
     };
