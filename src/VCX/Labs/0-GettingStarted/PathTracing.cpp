@@ -70,7 +70,7 @@ namespace VCX::Labs::GettingStarted{
     };
     int numSpheres = sizeof(spheres)/sizeof(Sphere);
 
-/*头文件
+/*见头文件
     //5. convert colors to displayable range [0,255]
     //inline double clamp(double x){return x<0 ? 0 : x>1 ? 1 : x;}
     //convert float to int; gamma correction of 2.2
@@ -188,7 +188,7 @@ using ProgressCallback = std::function<void(float)>;
 //loops over image pixels, creates image
 Vec* PathTracing(int w, int h, int samps, ProgressCallback progressCallback){
     //image size
-    w=512, h=384;
+    //w=512, h=384;
     //sampling 
     //int samps = argc == 2 ? atoi(argv[1])/4 : 1;
     //samps = 1;
@@ -238,18 +238,19 @@ Vec* PathTracing(int w, int h, int samps, ProgressCallback progressCallback){
 
     //write out
     for (int i = 0; i < w * h; i++) {
-        // 输出 c[i] 的值
+/*        // 输出 c[i] 的值
     std::cout << "c[" << i << "] = (" 
               << c[i].x << ", " 
               << c[i].y << ", " 
               << c[i].z << ")\n";
+*/
     }
 
     //进度条：最终进度为100%
     if(progressCallback){
         progressCallback(1.0f);
     }
-    
+
     return c;
 }//path tracing() end
 

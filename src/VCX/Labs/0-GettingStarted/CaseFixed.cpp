@@ -11,7 +11,7 @@
 namespace VCX::Labs::GettingStarted {
     static constexpr auto c_Sizes = std::to_array<std::pair<std::uint32_t, std::uint32_t>>({
         { 512U, 384U },
-        { 1024U, 768U } 
+        { 768U, 576U } 
     });
 
     static constexpr auto c_SizeItems = std::array<char const *, 2> {
@@ -52,12 +52,12 @@ namespace VCX::Labs::GettingStarted {
     //控制边栏
     void CaseFixed::OnSetupPropsUI() {
         ImGui::Checkbox("Zoom Tooltip", &_enableZoom);
+        //调整尺寸
         _recompute |= ImGui::Combo("Size", &_sizeId, c_SizeItems.data(), c_SizeItems.size());
-        //_recompute |= ImGui::Combo("Background", &_bgId, c_BgItems.data(), c_BgItems.size());
         
         // 添加滑块用于调整采样值
         int prevSamps = _samps;
-        ImGui::SliderInt("Samples", &_samps, c_SampsMin, c_SampsMax);
+        ImGui::SliderInt("SPP/4", &_samps, c_SampsMin, c_SampsMax);
         if (prevSamps != _samps) {
             _recompute = true; // 如果采样值发生变化，则标记需要重新计算
         }
@@ -73,8 +73,10 @@ namespace VCX::Labs::GettingStarted {
  
     //渲染
     Common::CaseRenderResult CaseFixed::OnRender(std::pair<std::uint32_t, std::uint32_t> const desiredSize) {
-        auto const width = 512;
-        auto const height = 384;
+        //auto const width = 512;
+        //auto const height = 384;
+        std::uint32_t width = c_Sizes[_sizeId].first;   
+        std::uint32_t height = c_Sizes[_sizeId].second;
 
         if(_recompute){
             _recompute = false;
@@ -113,7 +115,7 @@ namespace VCX::Labs::GettingStarted {
         return Common::CaseRenderResult {
             .Fixed     = true,
             .Image     = _textures[_sizeId],
-            .ImageSize = {512,384},
+            .ImageSize = {width,height},
         };
     }
 
