@@ -44,7 +44,7 @@ namespace VCX::Labs::GettingStarted {
         _recompute |= ImGui::Combo("Background", &_bgId, c_BgItems.data(), c_BgItems.size());
           
     }
-Vec* result = PathTracing(512, 384, 100);  
+Vec* result = PathTracing(512, 384, 1);  
     //渲染
     Common::CaseRenderResult CaseFixed::OnRender(std::pair<std::uint32_t, std::uint32_t> const desiredSize) {
         auto const width = 512;

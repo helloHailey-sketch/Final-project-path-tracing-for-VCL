@@ -63,9 +63,9 @@ namespace VCX::Labs::GettingStarted{
         Sphere(1e5, Vec(50, 40.8, -1e5+170), Vec(),Vec(),0), //front wall
         Sphere(1e5, Vec(50, 1e5, 81.6), Vec(),Vec(0.75,0.75,0.75),0), //bottom wall
         Sphere(1e5, Vec(50, -1e5+81.6, 81.6), Vec(),Vec(0.75,0.75,0.75),0), //top wall
-        Sphere(16.5, Vec(27, 16.5, 47), Vec(),Vec(1,1,1)*999,1), //mirror
-        Sphere(16.5, Vec(73, 16.5, 78), Vec(),Vec(1,1,1)*999,2), //glass
-        Sphere(1.5, Vec(50, 81.6-16.5, 81.6), Vec(4,4,4)*100,Vec(),0), //left wall
+        Sphere(16.5, Vec(27, 16.5, 47), Vec(),Vec(1,1,1)*0.999,1), //mirror
+        Sphere(16.5, Vec(73, 16.5, 78), Vec(),Vec(1,1,1)*0.999,2), //glass
+        Sphere(1.5, Vec(50, 81.6-16.5, 81.6), Vec(4,4,4)*100,Vec(),0), //light
     };
     int numSpheres = sizeof(spheres)/sizeof(Sphere);
 
@@ -79,6 +79,7 @@ namespace VCX::Labs::GettingStarted{
     inline bool intersect(const Ray &r, double &t, int &id){
         double d;
         double inf = t = 1e20;
+        //double n = sizeof(spheres)/sizeof(Sphere);
 
         for(int i = numSpheres; i--;){
             if((d=spheres[i].intersect(r))&&d<t){
@@ -122,6 +123,7 @@ namespace VCX::Labs::GettingStarted{
             Vec v = w%u;
             Vec d = (u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1-r2)).norm(); //采样方向
 
+/*
             //loop over lights
             Vec e;
             for(int i = 0; i<numSpheres; i++){
@@ -146,6 +148,8 @@ namespace VCX::Labs::GettingStarted{
                 }
             }//loop over lights end
             return obj.e*E + e + f.mult(radiance(Ray(x,d),depth,Xi,0));
+*/
+            return obj.e + f.mult(radiance(Ray(x,d),depth,Xi,0));
         }//diffuse end 
 
         //1. ideal specular(mirror)
@@ -171,7 +175,7 @@ namespace VCX::Labs::GettingStarted{
         double Re = R0 + (1-R0)*c*c*c*c*c; //Schlick近似公式求菲涅耳反射系数
         double Tr = 1-Re;//折射比例
         //定义概率p，调整权重
-        double P=0.25+0.25*Re, RP=Re/P, TP=Tr/(1-p);
+        double P=0.25+0.5*Re, RP=Re/P, TP=Tr/(1-P);
         //depth>2则轮盘赌，erand48(Xi)<P折射，否则反射
         return obj.e + f.mult(depth>2 ? (erand48(Xi)<P ?
             radiance(reflRay, depth, Xi)*RP:radiance(Ray(x,tdir),depth,Xi)*TP):
@@ -185,7 +189,7 @@ Vec* PathTracing(int w, int h, int samps){
     w=512, h=384;
     //sampling 
     //int samps = argc == 2 ? atoi(argv[1])/4 : 1;
-    samps = 1;
+    //samps = 1;
     //camera position & direction
     Ray cam(Vec(50,52,295.6), Vec(0,-0.042612,-1).norm());
     //horizantal(x) direction increment (uses implicit 0 for y,z);0.5135 defines field of view angle
@@ -213,7 +217,7 @@ Vec* PathTracing(int w, int h, int samps){
                         //tent filter
                         double r1 = 2 * erand48(Xi), dx=r1<1? sqrt(r1)-1: 1-sqrt(2-r1);
                         double r2 = 2 * erand48(Xi), dy=r2<1? sqrt(r2)-1: 1-sqrt(2-r2);
-                        Vec d = cx * (((sx+0.5+dx)/2 + x)/w-0.5) + cy * (((sy+0.5+dx)/2 + y)/h-0.5) + cam.d;
+                        Vec d = cx * (((sx+0.5+dx)/2 + x)/w-0.5) + cy * (((sy+0.5+dy)/2 + y)/h-0.5) + cam.d;
                         r = r+radiance(Ray(cam.o + d*140, d.norm()),0,Xi)*(1./samps);
                     }//tent filter end
                     //camera rays are pushed forward to start in interior？？
@@ -226,11 +230,10 @@ Vec* PathTracing(int w, int h, int samps){
     //write out
     for (int i = 0; i < w * h; i++) {
         // 输出 c[i] 的值
-/*    std::cout << "c[" << i << "] = (" 
+    std::cout << "c[" << i << "] = (" 
               << c[i].x << ", " 
               << c[i].y << ", " 
               << c[i].z << ")\n";
-*/
     }
     return c;
 }//path tracing() end
