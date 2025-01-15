@@ -16,6 +16,10 @@ namespace VCX::Labs::GettingStarted {
         virtual void OnSetupPropsUI() override;
         virtual Common::CaseRenderResult OnRender(std::pair<std::uint32_t, std::uint32_t> const desiredSize) override;
         virtual void OnProcessInput(ImVec2 const & pos) override;
+
+        // 进度条：设置渲染进度的回调函数
+        using ProgressCallback = std::function<void(float)>; // 回调函数类型定义
+        void SetProgressCallback(ProgressCallback callback); // 设置回调函数的方法
     
     private:
 
@@ -27,5 +31,11 @@ namespace VCX::Labs::GettingStarted {
         int  _bgId       = 0; //选择背景
         bool _enableZoom = true;
         bool _recompute  = true;
+        int _samps = 1;  // 当前的采样数量，默认为 1
+
+        //进度条
+        float _progress = 0.0f; // 渲染进度 (0.0 - 1.0)
+        std::atomic<bool> _isRendering = false; // 渲染状态标志
+        ProgressCallback _progressCallback; // 渲染进度的回调函数
     };
 }

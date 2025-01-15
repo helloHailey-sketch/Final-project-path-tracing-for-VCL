@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include "Labs/0-GettingStarted/PathTracing.h"
 #include <iostream>
+#include <functional>
 
 namespace VCX::Labs::GettingStarted{
     //preliminaries
@@ -123,7 +124,7 @@ namespace VCX::Labs::GettingStarted{
             Vec v = w%u;
             Vec d = (u*cos(r1)*r2s + v*sin(r1)*r2s + w*sqrt(1-r2)).norm(); //采样方向
 
-/*
+
             //loop over lights
             Vec e;
             for(int i = 0; i<numSpheres; i++){
@@ -148,8 +149,7 @@ namespace VCX::Labs::GettingStarted{
                 }
             }//loop over lights end
             return obj.e*E + e + f.mult(radiance(Ray(x,d),depth,Xi,0));
-*/
-            return obj.e + f.mult(radiance(Ray(x,d),depth,Xi,0));
+
         }//diffuse end 
 
         //1. ideal specular(mirror)
@@ -182,9 +182,11 @@ namespace VCX::Labs::GettingStarted{
             radiance(reflRay, depth, Xi)*Re+radiance(Ray(x,tdir),depth,Xi)*Tr);
     }//Vec radiance end
 
+//进度条：声明回调函数类型
+using ProgressCallback = std::function<void(float)>;
 
 //loops over image pixels, creates image
-Vec* PathTracing(int w, int h, int samps){
+Vec* PathTracing(int w, int h, int samps, ProgressCallback progressCallback){
     //image size
     w=512, h=384;
     //sampling 
@@ -205,9 +207,16 @@ Vec* PathTracing(int w, int h, int samps){
     #pragma omp parallel for schedule(dynamic, 1) private(r) //openmp
     //each loop should be run in its own thread
 
+    
     //loop over all image pixels
     for(int y = 0; y < h; y++){
         fprintf(stderr,"\rRendering (%d spp) %5.2f%%", samps*4,100.*y/(h-1)); //打印进度
+        
+        //进度条：更新进度，通过回调函数通知外部
+        if(progressCallback){
+            progressCallback(static_cast<float>(y)/h);
+        }
+
         unsigned short Xi[3] = {0,0,static_cast<unsigned short>(y * y * y)}; //random number
         for(unsigned short x = 0; x<w; x++){
             //for each pixel do 2*2 subsample, samps samples per subsample
@@ -235,6 +244,12 @@ Vec* PathTracing(int w, int h, int samps){
               << c[i].y << ", " 
               << c[i].z << ")\n";
     }
+
+    //进度条：最终进度为100%
+    if(progressCallback){
+        progressCallback(1.0f);
+    }
+    
     return c;
 }//path tracing() end
 

@@ -10,13 +10,13 @@
 
 namespace VCX::Labs::GettingStarted {
     static constexpr auto c_Sizes = std::to_array<std::pair<std::uint32_t, std::uint32_t>>({
-        { 320U, 320U },
-        { 640U, 640U } 
+        { 512U, 384U },
+        { 1024U, 768U } 
     });
 
     static constexpr auto c_SizeItems = std::array<char const *, 2> {
-        "Small (320 x 320)",
-        "Large (640 x 640)"
+        "Small (512 x 384)",
+        "Large (1024 x 768)"
     };
 
     static constexpr auto c_BgItems = std::array<char const *, 3> {
@@ -24,6 +24,10 @@ namespace VCX::Labs::GettingStarted {
         "Black",
         "Checkboard"
     };
+
+    // 初始化可用采样数量的滑块范围
+    static constexpr int c_SampsMin = 1;
+    static constexpr int c_SampsMax = 100;
 
     CaseFixed::CaseFixed() :
         _textures(Engine::make_array<Engine::GL::UniqueTexture2D, c_Sizes.size()>(
@@ -34,41 +38,81 @@ namespace VCX::Labs::GettingStarted {
         _empty({
             Common::CreatePureImageRGB(c_Sizes[0].first, c_Sizes[0].second, { 2.f / 17, 2.f / 17, 2.f / 17 }),
             Common::CreatePureImageRGB(c_Sizes[1].first, c_Sizes[1].second, { 2.f / 17, 2.f / 17, 2.f / 17 })
-        }) {
+        }) ,
+         _samps(1), // 初始化采样值
+        _recompute(true) // 默认需要重新计算
+        {
+    }
+
+    //进度条：设置进度回调
+    void CaseFixed::SetProgressCallback(ProgressCallback callback){
+        _progressCallback = std::move(callback);
     }
 
     //控制边栏
     void CaseFixed::OnSetupPropsUI() {
         ImGui::Checkbox("Zoom Tooltip", &_enableZoom);
         _recompute |= ImGui::Combo("Size", &_sizeId, c_SizeItems.data(), c_SizeItems.size());
-        _recompute |= ImGui::Combo("Background", &_bgId, c_BgItems.data(), c_BgItems.size());
-          
+        //_recompute |= ImGui::Combo("Background", &_bgId, c_BgItems.data(), c_BgItems.size());
+        
+        // 添加滑块用于调整采样值
+        int prevSamps = _samps;
+        ImGui::SliderInt("Samples", &_samps, c_SampsMin, c_SampsMax);
+        if (prevSamps != _samps) {
+            _recompute = true; // 如果采样值发生变化，则标记需要重新计算
+        }
+
+        // 添加渲染进度条
+        if (_isRendering) {
+            ImGui::Text("Rendering...");
+            ImGui::ProgressBar(_progress, ImVec2(-1, 0));
+        } else {
+            ImGui::Text("Ready");
     }
-Vec* result = PathTracing(512, 384, 1);  
+    }
+ 
     //渲染
     Common::CaseRenderResult CaseFixed::OnRender(std::pair<std::uint32_t, std::uint32_t> const desiredSize) {
         auto const width = 512;
         auto const height = 384;
-        Common::ImageRGB image = Common::CreateCheckboardImageRGB(width, height);
-        //Common::ImageRGB image = Common::CreatePureImageRGB(width, height, { 0., 0., 0. });
-        //Vec* c = PathTracing(512, 384, 1);        
-        for (std::size_t y = 0; y < height; ++y){
-            for (std::size_t x = 0; x < width; ++x){
-                int i = y * width + x;
-                //image.At(x,y)={0.5, 0.5, 0.5};
-                //image.At(x,y)={toInt(result[i].x), toInt(result[i].y), toInt(result[i].z)};
-                image.At(x,y)={correct(result[i].x), correct(result[i].y), correct(result[i].z)};
-                /*    std::cout << "result[" << i << "] = (" 
-              << toInt(result[i].x) << ", " 
-              << toInt(result[i].x) << ", " 
-              << toInt(result[i].x) << ")\n"; */
+
+        if(_recompute){
+            _recompute = false;
+            _task.Emplace([this, width, height](){
+                Common::ImageRGB image (width, height);
+
+                //进度条
+                _isRendering = true;
+                _progress = 0.0f;
+
+                Vec* result = PathTracing(width, height, _samps, [this](float progress){
+                    _progress = progress;
+                }); 
+
+                for (std::size_t y = 0; y < height; ++y){
+                    for (std::size_t x = 0; x < width; ++x){
+                        int i = y * width + x;
+                        image.At(x,y)={correct(result[i].x), correct(result[i].y), correct(result[i].z)};
+                    }
+                }//遍历pixels结束
+                delete[] result;
+
+                //进度条
+                _isRendering = false;
+
+                return image;
             }
+            );
         }
         
-        _textures[0].Update(image);
+        //Common::ImageRGB image = Common::CreatePureImageRGB(width, height, { 0., 0., 0. });
+        //Vec* c = PathTracing(512, 384, 1);        
+    
+        
+        _textures[_sizeId].Update(_task.ValueOr(_empty[_sizeId]));
         return Common::CaseRenderResult {
             .Fixed     = true,
-            .Image     = _textures[0],
+            .Image     = _textures[_sizeId],
             .ImageSize = {512,384},
         };
     }

@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <cstdlib>
 #include <vector>
+#include <functional>
 
 
 namespace VCX::Labs::GettingStarted {
@@ -55,6 +56,9 @@ namespace VCX::Labs::GettingStarted {
     // 4. 核心路径追踪函数
     Vec radiance(const Ray &r, int depth, unsigned short *Xi, int E = 1);
 
+    //进度条：渲染进度回调函数类型
+    using ProgressCallback = std::function<void(float)>;
+
     // 5. 路径追踪入口
-    Vec* PathTracing(int w, int h, int samps);
+    Vec* PathTracing(int w, int h, int samps,ProgressCallback progressCallback);
 }
