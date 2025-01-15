@@ -1,6 +1,8 @@
 #include <math.h>
 #include <stdlib.h>
 #include <stdio.h>
+#include "Labs/0-GettingStarted/PathTracing.h"
+#include <iostream>
 
 namespace VCX::Labs::GettingStarted{
     //preliminaries
@@ -8,7 +10,7 @@ namespace VCX::Labs::GettingStarted{
     double erand48(unsigned short xsubi[3]){
         return (double)rand()/(double)RAND_MAX;
     }
-
+/* 头文件
     //1. 设置Vec操作（用于坐标、向量、rgb）
     struct Vec{
       double x,y,z;  
@@ -29,7 +31,7 @@ namespace VCX::Labs::GettingStarted{
         //constructor（direction should always be normalized)
         Ray(Vec o_, Vec d_) : o(o_), d(d_){}
     };
-
+*/
     //3. sphere　
     struct Sphere{
         double rad; //radius
@@ -67,11 +69,12 @@ namespace VCX::Labs::GettingStarted{
     };
     int numSpheres = sizeof(spheres)/sizeof(Sphere);
 
+/*头文件
     //5. convert colors to displayable range [0,255]
-    inline double clamp(double x){return x<0 ? 0 : x>1 ? 1 : x;}
+    //inline double clamp(double x){return x<0 ? 0 : x>1 ? 1 : x;}
     //convert float to int; gamma correction of 2.2
-    inline int toInt(double x){ return int(pow(clamp(x), 1/2.2)*255+0.5);}
-
+    //inline int toInt(double x){ return int(pow(clamp(x), 1/2.2)*255+0.5);}
+*/
     //6. intersects ray with scene
     inline bool intersect(const Ray &r, double &t, int &id){
         double d;
@@ -87,7 +90,7 @@ namespace VCX::Labs::GettingStarted{
     }
 
     //！！compute radiance estimate along ray (return radiance estimate)
-    Vec radiance(const Ray &r, int depth, unsigned short *Xi, int E=1){
+    Vec radiance(const Ray &r, int depth, unsigned short *Xi, int E){
         //intersection
         double t; //最近交点距离
         int id = 0;//球的id
@@ -175,12 +178,14 @@ namespace VCX::Labs::GettingStarted{
             radiance(reflRay, depth, Xi)*Re+radiance(Ray(x,tdir),depth,Xi)*Tr);
     }//Vec radiance end
 
+
 //loops over image pixels, creates image
-int PathTracing(int argc, char *argv[]){
+Vec* PathTracing(int w, int h, int samps){
     //image size
-    int w=512, h=384;
+    w=512, h=384;
     //sampling 
-    int samps = argc == 2 ? atoi(argv[1])/4 : 1;
+    //int samps = argc == 2 ? atoi(argv[1])/4 : 1;
+    samps = 1;
     //camera position & direction
     Ray cam(Vec(50,52,295.6), Vec(0,-0.042612,-1).norm());
     //horizantal(x) direction increment (uses implicit 0 for y,z);0.5135 defines field of view angle
@@ -189,13 +194,17 @@ int PathTracing(int argc, char *argv[]){
     Vec r; //临时颜色
     Vec *c = new Vec[w*h]; //image result
 
+    for (int i = 0; i < w * h; i++) {
+        c[i] = Vec(0, 0, 0); // 将每个元素归零
+    }
+
     #pragma omp parallel for schedule(dynamic, 1) private(r) //openmp
     //each loop should be run in its own thread
 
     //loop over all image pixels
     for(int y = 0; y < h; y++){
         fprintf(stderr,"\rRendering (%d spp) %5.2f%%", samps*4,100.*y/(h-1)); //打印进度
-        unsigned short Xi[3] = {0,0,y*y*y}; //random number
+        unsigned short Xi[3] = {0,0,static_cast<unsigned short>(y * y * y)}; //random number
         for(unsigned short x = 0; x<w; x++){
             //for each pixel do 2*2 subsample, samps samples per subsample
             for (int sy = 0, i = (h-y-1)*w+x; sy<2; sy++){ //2*2 subpixel rows
@@ -215,8 +224,15 @@ int PathTracing(int argc, char *argv[]){
     }//loop over all pixels end
 
     //write out
-
-
+    for (int i = 0; i < w * h; i++) {
+        // 输出 c[i] 的值
+/*    std::cout << "c[" << i << "] = (" 
+              << c[i].x << ", " 
+              << c[i].y << ", " 
+              << c[i].z << ")\n";
+*/
+    }
+    return c;
 }//path tracing() end
 
 }//namespace end

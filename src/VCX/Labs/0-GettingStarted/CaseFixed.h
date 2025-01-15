@@ -3,6 +3,7 @@
 #include "Engine/Async.hpp"
 #include "Labs/Common/ICase.h"
 #include "Labs/Common/ImageRGB.h"
+#include "Labs/0-GettingStarted/PathTracing.h"
 
 namespace VCX::Labs::GettingStarted {
 
