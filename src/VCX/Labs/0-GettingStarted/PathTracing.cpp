@@ -32,7 +32,7 @@ namespace VCX::Labs::GettingStarted{
         //constructor（direction should always be normalized)
         Ray(Vec o_, Vec d_) : o(o_), d(d_){}
     };
-*/
+
     //3. sphere　
     struct Sphere{
         double rad; //radius
@@ -55,7 +55,7 @@ namespace VCX::Labs::GettingStarted{
             return (t=b-det)>eps ? t : ((t=b+det)>eps ? t : 0);
         }
     };
-
+*/
     //4. scene:radius, position, emission, color, material(0=diffuse,1=specular,2=refractive)
     Sphere spheres[]={
         Sphere(1e5, Vec(1e5+1, 40.8, 81.6), Vec(),Vec(0.75,0.25,0.25),0), //left wall
@@ -75,7 +75,7 @@ namespace VCX::Labs::GettingStarted{
     //inline double clamp(double x){return x<0 ? 0 : x>1 ? 1 : x;}
     //convert float to int; gamma correction of 2.2
     //inline int toInt(double x){ return int(pow(clamp(x), 1/2.2)*255+0.5);}
-*/
+
     //6. intersects ray with scene
     inline bool intersect(const Ray &r, double &t, int &id){
         double d;
@@ -90,13 +90,14 @@ namespace VCX::Labs::GettingStarted{
         }
         return t<inf; //true or false
     }
+*/
 
     //！！compute radiance estimate along ray (return radiance estimate)
     Vec radiance(const Ray &r, int depth, unsigned short *Xi, int E){
         //intersection
         double t; //最近交点距离
         int id = 0;//球的id
-        if (!intersect(r,t,id)) return Vec() ;//miss:return black
+        if (!intersect(r,spheres,numSpheres,t,id)) return Vec() ;//miss:return black
         const Sphere &obj = spheres[id];//球的id
         if (depth >10) return Vec();
         Vec x = r.o+r.d * t; //交点
@@ -143,7 +144,7 @@ namespace VCX::Labs::GettingStarted{
                 l.norm();
 
                 //create shadow ray
-                if (intersect(Ray(x,l),t,id) && id == i){
+                if (intersect(Ray(x,l),spheres,numSpheres,t,id) && id == i){
                     double omega = 2*M_PI*(1-cos_a_max); //计算立体角（solid angle）
                     e = e + f.mult(s.e*l.dot(nl)*omega)*M_1_PI;
                 }
