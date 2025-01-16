@@ -5,6 +5,7 @@
 #include <cstdlib>
 #include <vector>
 #include <functional>
+#include <algorithm>
 
 
 namespace VCX::Labs::GettingStarted {
@@ -21,6 +22,14 @@ namespace VCX::Labs::GettingStarted {
         Vec& norm() {return *this = *this *(1/sqrt(x*x+y*y+z*z));}
         double dot(const Vec &b)const {return x*b.x+y*b.y+z*b.z;}
         Vec operator%(Vec &b) {return Vec(y*b.z-z*b.y,z*b.x-x*b.z,x*b.y-y*b.x);}//cross
+
+        // aabb用：添加索引访问操作符
+        double operator[](int i) const {
+            if (i == 0) return x;
+            if (i == 1) return y;
+            if (i == 2) return z;
+            throw std::out_of_range("Index out of range for Vec");
+        }
     };
 
     // 2. Ray 类
@@ -58,6 +67,29 @@ namespace VCX::Labs::GettingStarted {
     extern Sphere spheres[];
     extern int numSpheres;
 */
+
+    //bvh
+    struct AABB {
+        Vec min, max;
+        AABB();
+        AABB(const Vec &min_, const Vec &max_);
+        bool intersect(const Ray &r, double &tmin, double &tmax) const;
+        static AABB merge(const AABB &a, const AABB &b);
+    };
+
+    struct BVHNode {
+        AABB box;          // 节点的包围盒
+        int start, end;    // 球体的范围（叶节点）
+        BVHNode *left, *right; // 子节点
+        BVHNode() : start(0), end(0), left(nullptr), right(nullptr) {}
+    };
+    //bvh构建:indices(球体索引数组),spheres(球体数组),start, end(球体范围)
+    BVHNode *buildBVH(std::vector<int> &indices, const std::vector<Sphere> &spheres, int start, int end);
+    //光线与bvh相交
+    bool intersectBVH(const Ray &r, const BVHNode *node, const std::vector<Sphere> &spheres, const std::vector<int> &indices,double &t, int &id);
+    //使用bvh进行场景光线相交测试
+    //bool intersect(const Ray &r, double &t, int &id, const BVHNode *bvhRoot, const std::vector<Sphere> &spheres);
+
     //5. convert colors to displayable range [0,255]
     inline double clamp(double x){return x<0 ? 0 : x>1 ? 1 : x;}
     //convert float to int; gamma correction of 2.2
@@ -80,8 +112,9 @@ namespace VCX::Labs::GettingStarted {
         return t<inf; //true or false
     }
 
+
     // 4. 核心路径追踪函数
-    Vec radiance(const Ray &r, int depth, unsigned short *Xi, int E = 1);
+    Vec radiance(const Ray &r, int depth, unsigned short *Xi, const BVHNode *bvhRoot, const std::vector<Sphere> &spheres,const std::vector<int> &indices, int E = 1);
 
     //进度条：渲染进度回调函数类型
     using ProgressCallback = std::function<void(float)>;

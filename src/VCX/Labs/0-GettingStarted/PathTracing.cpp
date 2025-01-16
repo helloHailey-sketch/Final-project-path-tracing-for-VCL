@@ -92,12 +92,136 @@ namespace VCX::Labs::GettingStarted{
     }
 */
 
+    //bvh加速：struct AABB
+    AABB::AABB() : min(Vec(1e20, 1e20, 1e20)), max(Vec(-1e20, -1e20, -1e20)) {}
+    AABB::AABB(const Vec &min_, const Vec &max_) : min(min_), max(max_) {}
+    // 包围盒与光线的相交测试
+    bool AABB::intersect(const Ray &r, double &tmin, double &tmax) const {
+        for (int i = 0; i < 3; i++) {
+            double invD = 1.0 / r.d[i];//光线与平面x=min[i]相交的t=（min[i]-r.o[i])/r.d[i]
+            double t0 = (min[i] - r.o[i]) * invD;//ray=r.o+t*r.d,进入包围盒的t
+            double t1 = (max[i] - r.o[i]) * invD;//离开包围盒的t
+            if (invD < 0.0) std::swap(t0, t1); //若光线方向为负，交换t0，t1
+            tmin = t0 > tmin ? t0 : tmin;//光线进入包围盒
+            tmax = t1 < tmax ? t1 : tmax;//光线离开包围盒
+            if (tmax <= tmin) return false;
+        }
+        return true; //所有轴都相交：光线与包围盒相交
+    }
+    // 包围盒合并成一个大包围盒
+    AABB AABB::merge(const AABB &a, const AABB &b) {
+        Vec merge_min (std::min(a.min.x, b.min.x),std::min(a.min.y, b.min.y),std::min(a.min.z, b.min.z)) ;
+        Vec merge_max (std::max(a.max.x, b.max.x),std::max(a.max.y, b.max.y),std::max(a.max.z, b.max.z)) ;
+        return AABB(merge_min, merge_max);
+    }
+    //struct BVHNode见h
+    //bvh构建:indices(球体索引数组),spheres(球体数组),start, end(球体范围)
+    BVHNode *buildBVH(std::vector<int> &indices, const std::vector<Sphere> &spheres, int start, int end) {
+        BVHNode *node = new BVHNode();
+
+        // 计算当前节点的包围盒
+        AABB box;
+        for (int i = start; i < end; i++) {
+            const Sphere &s = spheres[indices[i]];
+            Vec sphereMin = s.p - Vec(s.rad, s.rad, s.rad);
+            Vec sphereMax = s.p + Vec(s.rad, s.rad, s.rad);
+            box = AABB::merge(box, AABB(sphereMin, sphereMax));
+        }
+        node->box = box;
+
+        // 如果是叶节点：不再划分，返回node
+        if (end - start <= 1) {
+            node->start = start;
+            node->end = end;
+            return node;
+        }
+
+        // 划分空间，按坐标轴排序（x轴）
+        int axis = 0;
+        //依据中心点对indices排序，范围为start～end
+        //！！indice才是真正记录了排序后的球，不是sphere下标！！
+        std::sort(indices.begin() + start, indices.begin() + end, [&](int a, int b) {
+            return spheres[a].p[axis] < spheres[b].p[axis];
+        });
+
+        // 递归构建左右子树
+        int mid = (start + end) / 2;
+        node->left = buildBVH(indices, spheres, start, mid);
+        node->right = buildBVH(indices, spheres, mid, end);
+        return node;
+    }
+
+    //调试node创建
+    void printAABB(const AABB &box) {
+    std::cout << "AABB: min=(" 
+              << box.min.x << ", " << box.min.y << ", " << box.min.z << "), max=("
+              << box.max.x << ", " << box.max.y << ", " << box.max.z << ")" 
+              << std::endl;
+}
+
+    void printBVHNode(const BVHNode *node, int depth) {
+    std::cout << std::string(depth * 2, ' ') // 用缩进表示深度
+              << "Node at depth " << depth 
+              << " | Start: " << node->start 
+              << ", End: " << node->end 
+              << std::endl;
+
+    printAABB(node->box);
+}
+    void traverseBVH(const BVHNode *node, int depth = 0) {
+    if (!node) return;
+
+    // 打印当前节点信息
+    printBVHNode(node, depth);
+
+    // 递归遍历子节点
+    if (node->left) traverseBVH(node->left, depth + 1);
+    if (node->right) traverseBVH(node->right, depth + 1);
+}
+
+    //bvh相交测试:indices(球体索引数组),spheres(球体数组),start,end(球体范围)
+    bool intersectBVH(const Ray &r, const BVHNode *node, const std::vector<Sphere> &spheres, const std::vector<int> &indices,double &t, int &id) {
+        double tmin = 0, tmax = 1e20;
+        if (!node->box.intersect(r, tmin, tmax)) return false; // 光线未与包围盒相交
+
+        if (node->left == nullptr && node->right == nullptr) {
+            // 没有子节点：自己是叶节点，测试光线与球体相交
+            bool hit = false;
+            for (int i = node->start; i < node->end; i++) {
+                int sphereIdx = indices[i]; 
+                double d = spheres[sphereIdx].intersect(r);
+                if (d && d < t) {
+                    t = d;
+                    id = sphereIdx;
+                    hit = true;
+                }
+            }
+/*            std::cout << "Intersecting BVH, ray=(" << r.o.x << ", " << r.o.y << ", " << r.o.z 
+          << ") -> (" << r.d.x << ", " << r.d.y << ", " << r.d.z << ")" << std::endl;
+*/
+            //if(id != 0) std::cout<<id;
+            return hit;
+        }
+        // 检查左右子树
+        bool hitLeft = node->left && intersectBVH(r, node->left, spheres, indices,t, id);
+        bool hitRight = node->right && intersectBVH(r, node->right, spheres, indices, t, id);
+        return hitLeft || hitRight;//光线与左右子树中的任意一个几何体相交
+    }
+
+/*
+    //bvh相交接口
+    bool intersect(const Ray &r, double &t, int &id, const BVHNode *bvhRoot, const std::vector<Sphere> &spheres) {
+        return intersectBVH(r, bvhRoot, spheres, t, id);
+    }
+*/
+
     //！！compute radiance estimate along ray (return radiance estimate)
-    Vec radiance(const Ray &r, int depth, unsigned short *Xi, int E){
+    Vec radiance(const Ray &r, int depth, unsigned short *Xi, const BVHNode *bvhRoot, const std::vector<Sphere> &spheres,const std::vector<int> &indices,int E){
         //intersection
-        double t; //最近交点距离
+        double t = 1e20; //最近交点距离
         int id = 0;//球的id
-        if (!intersect(r,spheres,numSpheres,t,id)) return Vec() ;//miss:return black
+        //if (!intersect(r,spheres,numSpheres,t,id)) return Vec() ;//miss:return black
+        if (!intersectBVH(r, bvhRoot, spheres,indices,t,id)) return Vec() ;
         const Sphere &obj = spheres[id];//球的id
         if (depth >10) return Vec();
         Vec x = r.o+r.d * t; //交点
@@ -144,18 +268,20 @@ namespace VCX::Labs::GettingStarted{
                 l.norm();
 
                 //create shadow ray
-                if (intersect(Ray(x,l),spheres,numSpheres,t,id) && id == i){
+                //if (intersect(Ray(x,l),spheres,numSpheres,t,id) && id == i){
+                double shadowT = 1e20;
+                if (intersectBVH(Ray(x,l),bvhRoot, spheres,indices, shadowT,id) && id == i){
                     double omega = 2*M_PI*(1-cos_a_max); //计算立体角（solid angle）
                     e = e + f.mult(s.e*l.dot(nl)*omega)*M_1_PI;
                 }
             }//loop over lights end
-            return obj.e*E + e + f.mult(radiance(Ray(x,d),depth,Xi,0));
+            return obj.e*E + e + f.mult(radiance(Ray(x,d),depth,Xi,bvhRoot,spheres,indices,0));
 
         }//diffuse end 
 
         //1. ideal specular(mirror)
         else if(obj.refl == 1){
-            return obj.e + f.mult(radiance(Ray(x,r.d-n*2*n.dot(r.d)),depth, Xi));
+            return obj.e + f.mult(radiance(Ray(x,r.d-n*2*n.dot(r.d)),depth, Xi,bvhRoot,spheres,indices));
             //reflected ray: r.d-n*2*n.dot(r.d)
         }
 
@@ -167,7 +293,7 @@ namespace VCX::Labs::GettingStarted{
 
         //判断是否发生全反射 cos2t=光线折射角的余弦平方值，cos2t<0全反射
         if((cos2t = 1-nnt*nnt*(1-ddn*ddn))<0){
-            return obj.e + f.mult(radiance(reflRay, depth, Xi));
+            return obj.e + f.mult(radiance(reflRay, depth, Xi,bvhRoot,spheres,indices));
         }
 
         //otherwise反射或折射
@@ -179,8 +305,8 @@ namespace VCX::Labs::GettingStarted{
         double P=0.25+0.5*Re, RP=Re/P, TP=Tr/(1-P);
         //depth>2则轮盘赌，erand48(Xi)<P折射，否则反射
         return obj.e + f.mult(depth>2 ? (erand48(Xi)<P ?
-            radiance(reflRay, depth, Xi)*RP:radiance(Ray(x,tdir),depth,Xi)*TP):
-            radiance(reflRay, depth, Xi)*Re+radiance(Ray(x,tdir),depth,Xi)*Tr);
+            radiance(reflRay, depth, Xi,bvhRoot,spheres,indices)*RP:radiance(Ray(x,tdir),depth,Xi,bvhRoot,spheres,indices)*TP):
+            radiance(reflRay, depth, Xi,bvhRoot,spheres,indices)*Re+radiance(Ray(x,tdir),depth,Xi,bvhRoot,spheres,indices)*Tr);
     }//Vec radiance end
 
 //进度条：声明回调函数类型
@@ -205,10 +331,17 @@ Vec* PathTracing(int w, int h, int samps, ProgressCallback progressCallback){
         c[i] = Vec(0, 0, 0); // 将每个元素归零
     }
 
+    //bvh结构初始化
+    std::vector<Sphere> spheresVec(spheres, spheres + numSpheres);
+    std::vector<int> indices(numSpheres);//索引
+    for (int i = 0; i < numSpheres; i++) indices[i] = i;
+    // 构建 BVH：indices(球体索引数组),spheres(球体数组),start, end(球体范围)
+    BVHNode *bvhRoot = buildBVH(indices, spheresVec, 0, numSpheres);
+    std::cout << "BVH Tree Structure:" << std::endl;
+    traverseBVH(bvhRoot);
     #pragma omp parallel for schedule(dynamic, 1) private(r) //openmp
     //each loop should be run in its own thread
 
-    
     //loop over all image pixels
     for(int y = 0; y < h; y++){
         fprintf(stderr,"\rRendering (%d spp) %5.2f%%", samps*4,100.*y/(h-1)); //打印进度
@@ -228,7 +361,7 @@ Vec* PathTracing(int w, int h, int samps, ProgressCallback progressCallback){
                         double r1 = 2 * erand48(Xi), dx=r1<1? sqrt(r1)-1: 1-sqrt(2-r1);
                         double r2 = 2 * erand48(Xi), dy=r2<1? sqrt(r2)-1: 1-sqrt(2-r2);
                         Vec d = cx * (((sx+0.5+dx)/2 + x)/w-0.5) + cy * (((sy+0.5+dy)/2 + y)/h-0.5) + cam.d;
-                        r = r+radiance(Ray(cam.o + d*140, d.norm()),0,Xi)*(1./samps);
+                        r = r+radiance(Ray(cam.o + d*140, d.norm()),0,Xi,bvhRoot,spheresVec,indices)*(1./samps);
                     }//tent filter end
                     //camera rays are pushed forward to start in interior？？
                     c[i] = c[i]+Vec(clamp(r.x),clamp(r.y),clamp(r.z))*0.25; //color accumulation with gamma correction
